@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WINDOW</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #fff;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    /* ── HUD ───────────────────────────────────────────── */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+
+
+
+    /* ── Windows ───────────────────────────────────────── */
+    .win {
+      position: absolute;
+      background: #fff;
+      cursor: default;
+      user-select: none;
+    }
+
+    .win-titlebar {
+      background: #00aeef;
+      padding: 6px 6px 6px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: grab;
+    }
+
+    .win-titlebar:active { cursor: grabbing; }
+
+    .win-title {
+      color: #ffe600;
+      font-family: 'Arial Black', 'Franklin Gothic Heavy', Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-transform: lowercase;
+    }
+
+    .win-close {
+      background: #d62b2b;
+      border: none;
+      cursor: pointer;
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 900;
+      color: #fff;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .win-title {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .win-body {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .win.minimized .win-body {
+      display: none;
+    }
+
+    .win-body img {
+      width: 100%;
+      display: block;
+      pointer-events: none;
+    }
+
+
+  </style>
+</head>
+<body>
+
+<!-- HUD -->
+<div id="hud">
+
+</div>
+
+<div id="canvas"></div>
+
+<script>
+// ── Time-based image groups ───────────────────────────────────────
+const GROUPS = [
+  {
+    hours: [22, 23, 0, 1, 2, 3, 4, 5],
+    images: [
+      'IMG_2736','IMG_2737','IMG_2738','IMG_2739','IMG_2740','IMG_2741','IMG_2742',
+      'IMG_2743','IMG_2744','IMG_2748','IMG_2750','IMG_2752','IMG_2754',
+      'IMG_2848','IMG_2850','IMG_2852','IMG_2854','IMG_2856','IMG_2858','IMG_2860',
+      'IMG_2862','IMG_2864','IMG_2866',
+    ]
+  },
+  {
+    hours: [6, 7, 8, 9],
+    images: [
+      'IMG_2887','IMG_2889','IMG_2891','IMG_2893','IMG_2895','IMG_2897','IMG_2899',
+      'IMG_2901','IMG_2903','IMG_2905',
+      'IMG_2926','IMG_2928','IMG_2930','IMG_2932','IMG_2934','IMG_2936','IMG_2938',
+      'IMG_2940','IMG_2942','IMG_2944','IMG_2946','IMG_2948','IMG_2950','IMG_2952',
+      'IMG_2954','IMG_2956','IMG_2957','IMG_2958','IMG_2960','IMG_2962','IMG_2964',
+      'IMG_2966','IMG_2968','IMG_2970','IMG_2971',
+    ]
+  },
+  {
+    hours: [10, 11, 12],
+    images: [
+      'IMG_2760','IMG_2762','IMG_2764','IMG_2766','IMG_2768','IMG_2770','IMG_2772',
+      'IMG_2774','IMG_2776','IMG_2778','IMG_2779',
+    ]
+  },
+  {
+    hours: [13, 14, 15, 16],
+    images: [
+      'IMG_2786','IMG_2788','IMG_2790','IMG_2792','IMG_2794','IMG_2796','IMG_2798',
+      'IMG_2800','IMG_2802','IMG_2804','IMG_2806',
+    ]
+  },
+  {
+    hours: [17, 18, 19, 20, 21],
+    images: [
+      'IMG_2808','IMG_2810','IMG_2812','IMG_2814','IMG_2816','IMG_2818','IMG_2820',
+      'IMG_2822','IMG_2824','IMG_2826','IMG_2828','IMG_2830','IMG_2832','IMG_2834',
+      'IMG_2836','IMG_2838','IMG_2840','IMG_2842','IMG_2844','IMG_2846',
+    ]
+  },
+];
+
+const hour = new Date().getHours();
+const ALL_IMAGES = GROUPS.find(g => g.hours.includes(hour)).images;
+
+// ── HUD ──────────────────────────────────────────────────────────
+const now = new Date();
+
+
+// ── Shuffle ──────────────────────────────────────────────────────
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ── Global drag state ────────────────────────────────────────────
+let drag = null;
+
+document.addEventListener('mousemove', (e) => {
+  if (!drag) return;
+  drag.el.style.left = (e.clientX - drag.offX) + 'px';
+  drag.el.style.top  = (e.clientY - drag.offY) + 'px';
+});
+
+document.addEventListener('mouseup', () => {
+  drag = null;
+  document.body.style.cursor = '';
+});
+
+// ── z-index management ───────────────────────────────────────────
+let zTop = 100;
+
+function bringToFront(el) {
+  el.style.zIndex = ++zTop;
+}
+
+// ── Window factory ───────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const VW = window.innerWidth;
+const VH = window.innerHeight;
+
+const WIDTHS = [190, 220, 255, 285, 320, 355];
+
+function makeWindow(imgName, index) {
+  const win = document.createElement('div');
+  win.className = 'win';
+
+  const w = WIDTHS[Math.floor(Math.random() * WIDTHS.length)];
+  win.style.width = w + 'px';
+
+  const pad = 50;
+  const x = pad + Math.random() * Math.max(VW - w - pad * 2, 0);
+  const y = pad + Math.random() * Math.max(VH - 320 - pad * 2, 0);
+  win.style.left = x + 'px';
+  win.style.top  = y + 'px';
+  win.style.zIndex = 10 + index;
+
+  // ── Title bar ────────────────────────────────────────
+  const titlebar = document.createElement('div');
+  titlebar.className = 'win-titlebar';
+
+  const title = document.createElement('span');
+  title.className = 'win-title';
+  title.textContent = imgName + '.JPEG';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'win-close';
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', (e) => { e.stopPropagation(); win.remove(); });
+
+  titlebar.appendChild(title);
+  titlebar.appendChild(closeBtn);
+
+  win.addEventListener('mousedown', (e) => {
+    if (e.target === closeBtn) return;
+    e.preventDefault();
+    bringToFront(win);
+    const rect = win.getBoundingClientRect();
+    drag = { el: win, offX: e.clientX - rect.left, offY: e.clientY - rect.top };
+    document.body.style.cursor = 'grabbing';
+  });
+
+  // ── Body ─────────────────────────────────────────────
+  const body = document.createElement('div');
+  body.className = 'win-body';
+
+  const img = document.createElement('img');
+  img.src = imgName + '.jpeg';
+  img.alt = imgName;
+  img.loading = 'lazy';
+  img.draggable = false;
+
+  body.appendChild(img);
+  win.appendChild(titlebar);
+  win.appendChild(body);
+
+  canvas.appendChild(win);
+}
+
+// ── Spawn random selection on every load ─────────────────────────
+const toShow = shuffle(ALL_IMAGES).slice(0, 12);
+toShow.forEach((img, i) => makeWindow(img, i));
+</script>
+
+</body>
+</html>
