@@ -13,6 +13,7 @@
       height: 100vh;
       overflow: hidden;
       font-family: 'Courier New', Courier, monospace;
+      transition: background-color 60s linear;
     }
 
     /* ── HUD ───────────────────────────────────────────── */
@@ -21,6 +22,20 @@
       inset: 0;
       pointer-events: none;
       z-index: 9999;
+    }
+
+    #clock {
+      position: fixed;
+      top: 14px;
+      left: 16px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #fff;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+      z-index: 9999;
+      pointer-events: none;
     }
 
 
@@ -102,6 +117,9 @@
 </head>
 <body>
 
+<!-- Clock -->
+<div id="clock"></div>
+
 <!-- HUD -->
 <div id="hud">
 
@@ -158,6 +176,48 @@ const GROUPS = [
 
 const hour = new Date().getHours();
 const ALL_IMAGES = GROUPS.find(g => g.hours.includes(hour)).images;
+
+// ── Background color by time ──────────────────────────────────────
+// stops: [hour (0-24), r, g, b]
+const BG_STOPS = [
+  { h: 0,  r: 10,  g: 15,  b: 60  },  // midnight — dark blue
+  { h: 6,  r: 173, g: 216, b: 240 },  // dawn — light blue
+  { h: 10, r: 255, g: 170, b: 80  },  // morning into afternoon — orange
+  { h: 17, r: 110, g: 60,  b: 170 },  // evening — purple
+  { h: 22, r: 10,  g: 15,  b: 60  },  // night — dark blue
+  { h: 24, r: 10,  g: 15,  b: 60  },
+];
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function getBgColor() {
+  const now = new Date();
+  const frac = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  let prev = BG_STOPS[0], next = BG_STOPS[BG_STOPS.length - 1];
+  for (let i = 0; i < BG_STOPS.length - 1; i++) {
+    if (frac >= BG_STOPS[i].h && frac < BG_STOPS[i + 1].h) {
+      prev = BG_STOPS[i]; next = BG_STOPS[i + 1]; break;
+    }
+  }
+  const t = (frac - prev.h) / (next.h - prev.h);
+  const r = Math.round(lerp(prev.r, next.r, t));
+  const g = Math.round(lerp(prev.g, next.g, t));
+  const b = Math.round(lerp(prev.b, next.b, t));
+  return `rgb(${r},${g},${b})`;
+}
+
+function updateBg() { document.body.style.backgroundColor = getBgColor(); }
+updateBg();
+setInterval(updateBg, 60000);
+
+// ── Clock ─────────────────────────────────────────────────────────
+const clockEl = document.getElementById('clock');
+function updateClock() {
+  const t = new Date();
+  clockEl.textContent = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+updateClock();
+setInterval(updateClock, 1000);
 
 // ── HUD ──────────────────────────────────────────────────────────
 const now = new Date();
